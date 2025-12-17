@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}YOLO11 Inference{% endblock %}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        .drop-zone {
+            border: 2px dashed #cbd5e1;
+            transition: all 0.3s ease;
+        }
+        .drop-zone:hover, .drop-zone.dragover {
+            border-color: #3b82f6;
+            background-color: #eff6ff;
+        }
+        .loader {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3b82f6;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .image-modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.9);
+            cursor: zoom-out;
+        }
+        .image-modal.active {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .image-modal img {
+            max-width: 95%;
+            max-height: 95%;
+            object-fit: contain;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+        }
+        .image-modal .close-btn {
+            position: absolute;
+            top: 20px;
+            right: 30px;
+            color: white;
+            font-size: 40px;
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+        .image-modal .close-btn:hover {
+            color: #ef4444;
+        }
+        .image-modal .modal-title {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: white;
+            font-size: 16px;
+            background: rgba(0, 0, 0, 0.6);
+            padding: 8px 16px;
+            border-radius: 6px;
+        }
+        .zoomable {
+            cursor: zoom-in;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .zoomable:hover {
+            transform: scale(1.02);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <nav class="bg-white shadow-sm border-b">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <i class="fas fa-eye text-blue-600 text-2xl mr-3"></i>
+                    <span class="font-bold text-xl text-gray-900">YOLO11 Inference</span>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <a href="/" class="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium">
+                        <i class="fas fa-home mr-1"></i> Home
+                    </a>
+                    <a href="/api/health" target="_blank" class="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium">
+                        <i class="fas fa-heartbeat mr-1"></i> API Health
+                    </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="bg-white border-t mt-auto">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <p class="text-center text-gray-500 text-sm">
+                YOLO11 Inference Pipeline &copy; 2025
+            </p>
+        </div>
+    </footer>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,5 @@
+.venv
+.windsurf
+.env
+output
+*__pycache__

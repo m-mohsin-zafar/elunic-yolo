@@ -1,0 +1,711 @@
+{% extends "base.html" %}
+
+{% block title %}YOLO11 Inference - Object Detection{% endblock %}
+
+{% block content %}
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+    <!-- Left Panel: Upload & Controls -->
+    <div class="space-y-6">
+        <!-- Model Status Card -->
+        <div class="bg-white rounded-lg shadow-sm p-6">
+            <h2 class="text-lg font-semibold text-gray-900 mb-4">
+                <i class="fas fa-cube text-blue-600 mr-2"></i>Model Status
+            </h2>
+            <div id="model-status" class="space-y-3">
+                <div class="flex items-center justify-between">
+                    <span class="text-gray-600">PyTorch Model</span>
+                    <span id="pytorch-status" class="px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-600">
+                        Checking...
+                    </span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-gray-600">ONNX Model</span>
+                    <span id="onnx-status" class="px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-600">
+                        Checking...
+                    </span>
+                </div>
+            </div>
+            <button id="convert-btn" class="mt-4 w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-2 px-4 rounded-lg transition hidden">
+                <i class="fas fa-exchange-alt mr-2"></i>Convert to ONNX
+            </button>
+        </div>
+
+        <!-- Upload Card -->
+        <div class="bg-white rounded-lg shadow-sm p-6">
+            <h2 class="text-lg font-semibold text-gray-900 mb-4">
+                <i class="fas fa-upload text-blue-600 mr-2"></i>Upload Image
+            </h2>
+            
+            <div id="drop-zone" class="drop-zone rounded-lg p-8 text-center cursor-pointer">
+                <input type="file" id="file-input" accept="image/*" class="hidden">
+                <i class="fas fa-cloud-upload-alt text-4xl text-gray-400 mb-3"></i>
+                <p class="text-gray-600 mb-2">Drag & drop an image here</p>
+                <p class="text-gray-400 text-sm">or click to browse</p>
+            </div>
+            
+            <div id="preview-container" class="mt-4 hidden">
+                <img id="preview-image" class="w-full rounded-lg" alt="Preview">
+                <p id="file-name" class="text-sm text-gray-500 mt-2"></p>
+            </div>
+        </div>
+
+        <!-- Threshold Settings -->
+        <div class="bg-white rounded-lg shadow-sm p-6">
+            <h2 class="text-lg font-semibold text-gray-900 mb-4">
+                <i class="fas fa-sliders-h text-blue-600 mr-2"></i>Threshold Settings
+            </h2>
+            
+            <div class="space-y-4">
+                <div>
+                    <div class="flex justify-between mb-1">
+                        <label class="text-sm font-medium text-gray-700">Confidence Threshold</label>
+                        <span id="conf-value" class="text-sm text-blue-600 font-medium">0.25</span>
+                    </div>
+                    <input type="range" id="conf-threshold" min="0.05" max="0.95" step="0.05" value="0.25"
+                        class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600">
+                    <p class="text-xs text-gray-500 mt-1">Minimum confidence for detections</p>
+                </div>
+                
+                <div>
+                    <div class="flex justify-between mb-1">
+                        <label class="text-sm font-medium text-gray-700">NMS IoU Threshold</label>
+                        <span id="nms-iou-value" class="text-sm text-blue-600 font-medium">0.45</span>
+                    </div>
+                    <input type="range" id="nms-iou-threshold" min="0.1" max="0.9" step="0.05" value="0.45"
+                        class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600">
+                    <p class="text-xs text-gray-500 mt-1">IoU threshold for Non-Maximum Suppression</p>
+                </div>
+                
+                <div>
+                    <div class="flex justify-between mb-1">
+                        <label class="text-sm font-medium text-gray-700">Comparison IoU Threshold</label>
+                        <span id="comp-iou-value" class="text-sm text-purple-600 font-medium">0.50</span>
+                    </div>
+                    <input type="range" id="comp-iou-threshold" min="0.1" max="0.9" step="0.05" value="0.50"
+                        class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-purple-600">
+                    <p class="text-xs text-gray-500 mt-1">Minimum IoU to match detections between models</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Inference Controls -->
+        <div class="bg-white rounded-lg shadow-sm p-6">
+            <h2 class="text-lg font-semibold text-gray-900 mb-4">
+                <i class="fas fa-play text-blue-600 mr-2"></i>Run Inference
+            </h2>
+            
+            <div class="space-y-3">
+                <button id="pytorch-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                    <i class="fas fa-fire mr-2"></i>PyTorch Inference
+                </button>
+                
+                <button id="onnx-btn" class="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-3 px-4 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                    <i class="fas fa-bolt mr-2"></i>ONNX Inference
+                </button>
+                
+                <button id="compare-btn" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-medium py-3 px-4 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                    <i class="fas fa-balance-scale mr-2"></i>Compare Both Models
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Right Panel: Results -->
+    <div class="space-y-6">
+        <!-- Loading Indicator -->
+        <div id="loading" class="bg-white rounded-lg shadow-sm p-8 text-center hidden">
+            <div class="loader mx-auto mb-4"></div>
+            <p class="text-gray-600">Processing image...</p>
+        </div>
+
+        <!-- Results Card -->
+        <div id="results-container" class="hidden">
+            <!-- Single Model Result -->
+            <div id="single-result" class="bg-white rounded-lg shadow-sm p-6 hidden">
+                <h2 class="text-lg font-semibold text-gray-900 mb-4">
+                    <i class="fas fa-check-circle text-green-600 mr-2"></i>
+                    <span id="result-title">Detection Results</span>
+                </h2>
+                
+                <div class="mb-4">
+                    <img id="result-image" class="w-full rounded-lg zoomable" alt="Result" onclick="openImageModal(this.src, 'Detection Result')">
+                    <p class="text-xs text-gray-400 mt-1 text-center"><i class="fas fa-search-plus mr-1"></i>Click image to enlarge</p>
+                </div>
+                
+                <div class="flex items-center justify-between mb-4">
+                    <span class="text-gray-600">Detections Found</span>
+                    <span id="detection-count" class="text-2xl font-bold text-blue-600">0</span>
+                </div>
+                
+                <div id="detections-list" class="space-y-2 max-h-64 overflow-y-auto">
+                </div>
+            </div>
+
+            <!-- Comparison Result -->
+            <div id="comparison-result" class="space-y-6 hidden">
+                <div class="bg-white rounded-lg shadow-sm p-6">
+                    <h2 class="text-lg font-semibold text-gray-900 mb-4">
+                        <i class="fas fa-balance-scale text-purple-600 mr-2"></i>Comparison Results
+                    </h2>
+                    
+                    <div class="grid grid-cols-3 gap-4 text-center mb-4">
+                        <div class="bg-blue-50 rounded-lg p-4">
+                            <p class="text-sm text-gray-600">Matched</p>
+                            <p id="matched-count" class="text-2xl font-bold text-blue-600">0</p>
+                        </div>
+                        <div class="bg-green-50 rounded-lg p-4">
+                            <p class="text-sm text-gray-600">Mean IoU</p>
+                            <p id="mean-iou" class="text-2xl font-bold text-green-600">-</p>
+                        </div>
+                        <div class="bg-purple-50 rounded-lg p-4">
+                            <p class="text-sm text-gray-600">Unmatched</p>
+                            <p id="unmatched-count" class="text-2xl font-bold text-purple-600">0</p>
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-4 text-center text-sm">
+                        <div class="bg-gray-50 rounded-lg p-2">
+                            <span class="text-gray-500">Min IoU:</span>
+                            <span id="min-iou" class="font-medium text-gray-700 ml-1">-</span>
+                        </div>
+                        <div class="bg-gray-50 rounded-lg p-2">
+                            <span class="text-gray-500">Max IoU:</span>
+                            <span id="max-iou" class="font-medium text-gray-700 ml-1">-</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- IoU Chart -->
+                <div class="bg-white rounded-lg shadow-sm p-6">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4">
+                        <i class="fas fa-chart-bar text-blue-600 mr-2"></i>IoU Analysis Chart
+                    </h3>
+                    <div class="relative" style="height: 300px;">
+                        <canvas id="iou-chart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Confidence Comparison Chart -->
+                <div class="bg-white rounded-lg shadow-sm p-6">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4">
+                        <i class="fas fa-chart-line text-green-600 mr-2"></i>Confidence Comparison
+                    </h3>
+                    <div class="relative" style="height: 250px;">
+                        <canvas id="confidence-chart"></canvas>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="bg-white rounded-lg shadow-sm p-4">
+                        <h3 class="font-medium text-gray-900 mb-2">
+                            <i class="fas fa-fire text-orange-500 mr-1"></i>PyTorch
+                            <span id="pytorch-count" class="text-sm text-gray-500 ml-1">(0)</span>
+                        </h3>
+                        <img id="pytorch-result-image" class="w-full rounded-lg zoomable" alt="PyTorch Result" onclick="openImageModal(this.src, 'PyTorch Detection Result')">
+                        <p class="text-xs text-gray-400 mt-1 text-center"><i class="fas fa-search-plus mr-1"></i>Click to enlarge</p>
+                    </div>
+                    <div class="bg-white rounded-lg shadow-sm p-4">
+                        <h3 class="font-medium text-gray-900 mb-2">
+                            <i class="fas fa-bolt text-green-500 mr-1"></i>ONNX
+                            <span id="onnx-count" class="text-sm text-gray-500 ml-1">(0)</span>
+                        </h3>
+                        <img id="onnx-result-image" class="w-full rounded-lg zoomable" alt="ONNX Result" onclick="openImageModal(this.src, 'ONNX Detection Result')">
+                        <p class="text-xs text-gray-400 mt-1 text-center"><i class="fas fa-search-plus mr-1"></i>Click to enlarge</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Image Modal -->
+        <div id="image-modal" class="image-modal" onclick="closeImageModal()">
+            <span class="close-btn" onclick="closeImageModal()">&times;</span>
+            <img id="modal-image" src="" alt="Enlarged view">
+            <div class="modal-title" id="modal-title"></div>
+        </div>
+
+        <!-- Empty State -->
+        <div id="empty-state" class="bg-white rounded-lg shadow-sm p-12 text-center">
+            <i class="fas fa-image text-6xl text-gray-300 mb-4"></i>
+            <h3 class="text-lg font-medium text-gray-900 mb-2">No Results Yet</h3>
+            <p class="text-gray-500">Upload an image and run inference to see detection results</p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const dropZone = document.getElementById('drop-zone');
+    const fileInput = document.getElementById('file-input');
+    const previewContainer = document.getElementById('preview-container');
+    const previewImage = document.getElementById('preview-image');
+    const fileName = document.getElementById('file-name');
+    const pytorchBtn = document.getElementById('pytorch-btn');
+    const onnxBtn = document.getElementById('onnx-btn');
+    const compareBtn = document.getElementById('compare-btn');
+    const convertBtn = document.getElementById('convert-btn');
+    const loading = document.getElementById('loading');
+    const resultsContainer = document.getElementById('results-container');
+    const singleResult = document.getElementById('single-result');
+    const comparisonResult = document.getElementById('comparison-result');
+    const emptyState = document.getElementById('empty-state');
+
+    let selectedFile = null;
+
+    // Check model status on load
+    async function checkModelStatus() {
+        try {
+            const response = await fetch('/api/models/status');
+            const data = await response.json();
+            
+            const pytorchStatus = document.getElementById('pytorch-status');
+            const onnxStatus = document.getElementById('onnx-status');
+            
+            if (data.pytorch.exists) {
+                pytorchStatus.textContent = 'Available';
+                pytorchStatus.className = 'px-2 py-1 rounded text-xs font-medium bg-green-100 text-green-700';
+            } else {
+                pytorchStatus.textContent = 'Not Found';
+                pytorchStatus.className = 'px-2 py-1 rounded text-xs font-medium bg-red-100 text-red-700';
+            }
+            
+            if (data.onnx.exists) {
+                onnxStatus.textContent = 'Available';
+                onnxStatus.className = 'px-2 py-1 rounded text-xs font-medium bg-green-100 text-green-700';
+                convertBtn.classList.add('hidden');
+            } else {
+                onnxStatus.textContent = 'Not Converted';
+                onnxStatus.className = 'px-2 py-1 rounded text-xs font-medium bg-yellow-100 text-yellow-700';
+                convertBtn.classList.remove('hidden');
+            }
+        } catch (error) {
+            console.error('Failed to check model status:', error);
+        }
+    }
+
+    // File handling
+    dropZone.addEventListener('click', () => fileInput.click());
+    
+    dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropZone.classList.add('dragover');
+    });
+    
+    dropZone.addEventListener('dragleave', () => {
+        dropZone.classList.remove('dragover');
+    });
+    
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('dragover');
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+            handleFile(files[0]);
+        }
+    });
+    
+    fileInput.addEventListener('change', (e) => {
+        if (e.target.files.length > 0) {
+            handleFile(e.target.files[0]);
+        }
+    });
+
+    function handleFile(file) {
+        if (!file.type.startsWith('image/')) {
+            alert('Please select an image file');
+            return;
+        }
+        
+        selectedFile = file;
+        fileName.textContent = file.name;
+        
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            previewImage.src = e.target.result;
+            previewContainer.classList.remove('hidden');
+        };
+        reader.readAsDataURL(file);
+        
+        // Enable buttons
+        pytorchBtn.disabled = false;
+        onnxBtn.disabled = false;
+        compareBtn.disabled = false;
+    }
+
+    // Convert to ONNX
+    convertBtn.addEventListener('click', async () => {
+        convertBtn.disabled = true;
+        convertBtn.innerHTML = '<div class="loader inline-block mr-2"></div>Converting...';
+        
+        try {
+            const response = await fetch('/api/convert', { method: 'POST' });
+            const data = await response.json();
+            
+            if (data.status === 'success') {
+                alert('Model converted successfully!');
+                checkModelStatus();
+            } else {
+                alert('Conversion failed: ' + data.error);
+            }
+        } catch (error) {
+            alert('Conversion failed: ' + error.message);
+        } finally {
+            convertBtn.disabled = false;
+            convertBtn.innerHTML = '<i class="fas fa-exchange-alt mr-2"></i>Convert to ONNX';
+        }
+    });
+
+    // Inference functions
+    async function runInference(endpoint, button) {
+        if (!selectedFile) return;
+        
+        const originalText = button.innerHTML;
+        button.disabled = true;
+        button.innerHTML = '<div class="loader inline-block mr-2"></div>Processing...';
+        
+        loading.classList.remove('hidden');
+        emptyState.classList.add('hidden');
+        resultsContainer.classList.add('hidden');
+        
+        const formData = new FormData();
+        formData.append('image', selectedFile);
+        formData.append('conf_threshold', confThreshold.value);
+        formData.append('iou_threshold', nmsIouThreshold.value);
+        
+        try {
+            const response = await fetch(endpoint, {
+                method: 'POST',
+                body: formData
+            });
+            
+            const data = await response.json();
+            
+            if (data.error) {
+                alert('Error: ' + data.error);
+                return;
+            }
+            
+            displaySingleResult(data);
+            
+        } catch (error) {
+            alert('Inference failed: ' + error.message);
+        } finally {
+            button.disabled = false;
+            button.innerHTML = originalText;
+            loading.classList.add('hidden');
+        }
+    }
+
+    function displaySingleResult(data) {
+        resultsContainer.classList.remove('hidden');
+        singleResult.classList.remove('hidden');
+        comparisonResult.classList.add('hidden');
+        emptyState.classList.add('hidden');
+        
+        document.getElementById('result-title').textContent = 
+            data.model_type === 'pytorch' ? 'PyTorch Results' : 'ONNX Results';
+        document.getElementById('result-image').src = '/api/output/' + data.output_image;
+        document.getElementById('detection-count').textContent = data.count;
+        
+        const detectionsList = document.getElementById('detections-list');
+        detectionsList.innerHTML = '';
+        
+        data.detections.forEach((det, i) => {
+            const div = document.createElement('div');
+            div.className = 'flex items-center justify-between bg-gray-50 rounded px-3 py-2';
+            div.innerHTML = `
+                <span class="font-medium text-gray-900">${det.class_name}</span>
+                <span class="text-sm text-gray-500">${(det.confidence * 100).toFixed(1)}%</span>
+            `;
+            detectionsList.appendChild(div);
+        });
+    }
+
+    async function runComparison() {
+        if (!selectedFile) return;
+        
+        const originalText = compareBtn.innerHTML;
+        compareBtn.disabled = true;
+        compareBtn.innerHTML = '<div class="loader inline-block mr-2"></div>Comparing...';
+        
+        loading.classList.remove('hidden');
+        emptyState.classList.add('hidden');
+        resultsContainer.classList.add('hidden');
+        
+        const formData = new FormData();
+        formData.append('image', selectedFile);
+        formData.append('conf_threshold', confThreshold.value);
+        formData.append('iou_threshold', nmsIouThreshold.value);
+        formData.append('comparison_iou_threshold', compIouThreshold.value);
+        
+        try {
+            const response = await fetch('/api/compare', {
+                method: 'POST',
+                body: formData
+            });
+            
+            const data = await response.json();
+            
+            if (data.error) {
+                alert('Error: ' + data.error);
+                return;
+            }
+            
+            displayComparisonResult(data);
+            
+        } catch (error) {
+            alert('Comparison failed: ' + error.message);
+        } finally {
+            compareBtn.disabled = false;
+            compareBtn.innerHTML = originalText;
+            loading.classList.add('hidden');
+        }
+    }
+
+    let iouChart = null;
+    let confidenceChart = null;
+
+    function displayComparisonResult(data) {
+        resultsContainer.classList.remove('hidden');
+        singleResult.classList.add('hidden');
+        comparisonResult.classList.remove('hidden');
+        emptyState.classList.add('hidden');
+        
+        document.getElementById('matched-count').textContent = data.comparison.matched_count;
+        document.getElementById('mean-iou').textContent = 
+            data.comparison.mean_iou ? (data.comparison.mean_iou * 100).toFixed(1) + '%' : '-';
+        document.getElementById('unmatched-count').textContent = 
+            data.comparison.pytorch_only + data.comparison.onnx_only;
+        document.getElementById('min-iou').textContent = 
+            data.comparison.min_iou ? (data.comparison.min_iou * 100).toFixed(1) + '%' : '-';
+        document.getElementById('max-iou').textContent = 
+            data.comparison.max_iou ? (data.comparison.max_iou * 100).toFixed(1) + '%' : '-';
+        
+        document.getElementById('pytorch-count').textContent = `(${data.pytorch.count})`;
+        document.getElementById('onnx-count').textContent = `(${data.onnx.count})`;
+        
+        document.getElementById('pytorch-result-image').src = '/api/output/' + data.pytorch.output_image;
+        document.getElementById('onnx-result-image').src = '/api/output/' + data.onnx.output_image;
+        
+        // Render charts
+        renderIoUChart(data.chart_data, data.comparison.iou_threshold_used);
+        renderConfidenceChart(data.chart_data);
+    }
+
+    function renderIoUChart(chartData, threshold) {
+        const ctx = document.getElementById('iou-chart').getContext('2d');
+        
+        // Destroy existing chart
+        if (iouChart) {
+            iouChart.destroy();
+        }
+        
+        if (!chartData || chartData.length === 0) {
+            ctx.font = '14px Arial';
+            ctx.fillStyle = '#9ca3af';
+            ctx.textAlign = 'center';
+            ctx.fillText('No matched detections to display', ctx.canvas.width / 2, ctx.canvas.height / 2);
+            return;
+        }
+        
+        const labels = chartData.map(d => `${d.index}. ${d.class_name}`);
+        const iouValues = chartData.map(d => (d.iou * 100).toFixed(1));
+        const thresholdLine = chartData.map(() => threshold * 100);
+        
+        // Color bars based on IoU value
+        const barColors = chartData.map(d => {
+            if (d.iou >= 0.75) return 'rgba(34, 197, 94, 0.8)';  // green
+            if (d.iou >= 0.5) return 'rgba(59, 130, 246, 0.8)';  // blue
+            return 'rgba(249, 115, 22, 0.8)';  // orange
+        });
+        
+        iouChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'IoU (%)',
+                        data: iouValues,
+                        backgroundColor: barColors,
+                        borderColor: barColors.map(c => c.replace('0.8', '1')),
+                        borderWidth: 1,
+                        borderRadius: 4,
+                    },
+                    {
+                        label: `Threshold (${(threshold * 100).toFixed(0)}%)`,
+                        data: thresholdLine,
+                        type: 'line',
+                        borderColor: 'rgba(239, 68, 68, 0.8)',
+                        borderWidth: 2,
+                        borderDash: [5, 5],
+                        pointRadius: 0,
+                        fill: false,
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top',
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                if (context.datasetIndex === 0) {
+                                    return `IoU: ${context.raw}%`;
+                                }
+                                return `Threshold: ${context.raw}%`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 100,
+                        title: {
+                            display: true,
+                            text: 'IoU (%)'
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Matched Detections'
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    function renderConfidenceChart(chartData) {
+        const ctx = document.getElementById('confidence-chart').getContext('2d');
+        
+        // Destroy existing chart
+        if (confidenceChart) {
+            confidenceChart.destroy();
+        }
+        
+        if (!chartData || chartData.length === 0) {
+            ctx.font = '14px Arial';
+            ctx.fillStyle = '#9ca3af';
+            ctx.textAlign = 'center';
+            ctx.fillText('No matched detections to display', ctx.canvas.width / 2, ctx.canvas.height / 2);
+            return;
+        }
+        
+        const labels = chartData.map(d => `${d.index}. ${d.class_name}`);
+        const pytorchConf = chartData.map(d => (d.pytorch_conf * 100).toFixed(1));
+        const onnxConf = chartData.map(d => (d.onnx_conf * 100).toFixed(1));
+        
+        confidenceChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'PyTorch Confidence (%)',
+                        data: pytorchConf,
+                        backgroundColor: 'rgba(59, 130, 246, 0.7)',
+                        borderColor: 'rgba(59, 130, 246, 1)',
+                        borderWidth: 1,
+                        borderRadius: 4,
+                    },
+                    {
+                        label: 'ONNX Confidence (%)',
+                        data: onnxConf,
+                        backgroundColor: 'rgba(34, 197, 94, 0.7)',
+                        borderColor: 'rgba(34, 197, 94, 1)',
+                        borderWidth: 1,
+                        borderRadius: 4,
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top',
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 100,
+                        title: {
+                            display: true,
+                            text: 'Confidence (%)'
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Matched Detections'
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    // Threshold slider handlers
+    const confThreshold = document.getElementById('conf-threshold');
+    const nmsIouThreshold = document.getElementById('nms-iou-threshold');
+    const compIouThreshold = document.getElementById('comp-iou-threshold');
+    const confValue = document.getElementById('conf-value');
+    const nmsIouValue = document.getElementById('nms-iou-value');
+    const compIouValue = document.getElementById('comp-iou-value');
+
+    confThreshold.addEventListener('input', (e) => {
+        confValue.textContent = parseFloat(e.target.value).toFixed(2);
+    });
+
+    nmsIouThreshold.addEventListener('input', (e) => {
+        nmsIouValue.textContent = parseFloat(e.target.value).toFixed(2);
+    });
+
+    compIouThreshold.addEventListener('input', (e) => {
+        compIouValue.textContent = parseFloat(e.target.value).toFixed(2);
+    });
+
+    // Image modal functions
+    function openImageModal(src, title) {
+        const modal = document.getElementById('image-modal');
+        const modalImg = document.getElementById('modal-image');
+        const modalTitle = document.getElementById('modal-title');
+        
+        modalImg.src = src;
+        modalTitle.textContent = title || '';
+        modal.classList.add('active');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeImageModal() {
+        const modal = document.getElementById('image-modal');
+        modal.classList.remove('active');
+        document.body.style.overflow = '';
+    }
+
+    // Close modal on Escape key
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            closeImageModal();
+        }
+    });
+
+    // Button event listeners
+    pytorchBtn.addEventListener('click', () => runInference('/api/predict/pytorch', pytorchBtn));
+    onnxBtn.addEventListener('click', () => runInference('/api/predict/onnx', onnxBtn));
+    compareBtn.addEventListener('click', runComparison);
+
+    // Initialize
+    checkModelStatus();
+</script>
+{% endblock %}

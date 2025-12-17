@@ -1,0 +1,29 @@
+Context:
+You will receive two files:
+http://yolo11n.pt – a YOLO model in PyTorch format.
+image.png – a sample image to test against.
+Your assignment has two main tasks:
+Predict (image.png) using the given YOLO model.
+Convert the http://yolo11n.pt model to ONNX and then use the converted ONNX model to run inference on the same image.png.
+Detailed Instructions - Environment Setup from Scratch:
+-Create a new development environment (e.g., a fresh Python virtual environment or Docker container).
+-Install all libraries required to run the PyTorch model and to perform the ONNX conversion (e.g., torch, onnx, onnxruntime, etc.).
+Mandatory: Use AI-assisted coding tools such as Windsuf, Cursor Pro (newest versions) to expedite your coding process. Explain in your video how you leveraged these AI tools.
+Please use this video as a guideline on how to code: [Coding Guidelines Video](https://www.youtube.com/watch?v=faPSZV5XwyI)
+Inference with the PyTorch Model
+Load the http://yolo11n.pt model in PyTorch
+
+
+
+-Run inference on image.png and output the results, such as bounding box coordinates, labels, and/or a labeled output image showing detections
+Convert the Model to ONNX
+-Convert the PyTorch model (http://yolo11n.pt) to ONNX format
+-Ensure the ONNX model is valid by using it for inference in your environment
+Inference with the ONNX Model
+Once the conversion is successful, use the ONNX model to run inference on image.png again
+Output the results in a human-readable format (e.g., console logs, bounding box overlays, etc.).
+Optional: IoU Comparison:
+-For an additional challenge, visualize and compare the predictions of the PyTorch and ONNX models.
+-You may include a simple Intersection over Union (IoU) comparison or chart to highlight how closely the two models’ detections align.
+-This optional task can help demonstrate deeper model understanding and provide insights into any discrepancies between outputs.
+-You may include a simple Intersection over Union (IoU) comparison or chart to highlight how closely the two models’ detections align.
