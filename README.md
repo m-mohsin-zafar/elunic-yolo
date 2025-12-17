@@ -224,11 +224,50 @@ curl -X POST -F "image=@path/to/image.png" \
 }
 ```
 
+## Docker
+
+### Quick Start
+
+Build and run with Docker Compose:
+
+```bash
+docker-compose up --build
+```
+
+Access the application at `http://localhost:5000`.
+
+### Development Mode
+
+Run with hot reload enabled:
+
+```bash
+docker-compose --profile dev up yolo-inference-dev
+```
+
+### Manual Docker Commands
+
+**Build the image:**
+```bash
+docker build -t yolo-inference .
+```
+
+**Run the container:**
+```bash
+docker run -p 5000:5000 -v ./data:/app/data:ro -v ./output:/app/output yolo-inference
+```
+
+### Volume Mounts
+
+| Path | Description |
+|------|-------------|
+| `/app/data` | Model files and input images (read-only) |
+| `/app/output` | Generated output images |
+
 ## Environment Variables
 
 Copy `.env.example` to `.env` and configure:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `FLASK_DEBUG` | 1 | Enable debug mode |
+| `FLASK_DEBUG` | 1 | Enable debug mode (use 0 in production) |
 | `PORT` | 5000 | Server port |
